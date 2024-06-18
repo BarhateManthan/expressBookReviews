@@ -3,29 +3,35 @@ const jwt = require('jsonwebtoken');
 const session = require('express-session');
 const customer_routes = require('./router/auth_users.js').authenticated;
 const genl_routes = require('./router/general.js').general;
+const bodyParser = require('body-parser');
 const app = express();
 
 app.use(express.json());
-app.use("/customer", session({
-  secret: "fingerprint_customer",
-  resave: true,
-  saveUninitialized: true
-}));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use("/customer", session({ secret: "fingerprint_customer", resave: true, saveUninitialized: true }));
 
+// Authentication middleware
 app.use("/customer/auth/*", function auth(req, res, next) {
-  const token = req.headers['authorization'];
+  // Check if the request contains a Bearer token
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
-    return res.status(401).json({ message: "Access denied. No token provided." });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: "Authorization header is missing or malformed" });
   }
 
-  try {
-    const decoded = jwt.verify(token, "your_jwt_secret");
+  // Extract the token from the Authorization header
+  const token = authHeader.split(' ')[1];
+
+  // Verify the token
+  jwt.verify(token, 'your_secret_key', (err, decoded) => {
+    if (err) {
+      return res.status(401).json({ message: "Token is not valid" });
+    }
+
+    // Store the decoded user information in the request object
     req.user = decoded;
     next();
-  } catch (err) {
-    return res.status(400).json({ message: "Invalid token." });
-  }
+  });
 });
 
 const PORT = 5000;
